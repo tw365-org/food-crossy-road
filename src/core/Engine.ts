@@ -26,13 +26,11 @@ export class Engine {
   public currentMode: 'normal' | 'hell' = 'normal';
   public currentLevel: number = 1;
 
-  // 網格與尺寸常數
   public readonly cellSize: number = 50;
   public readonly gridCols: number = 10;
   public readonly stageWidth: number = 500;
   public readonly stageHeight: number = 700;
 
-  // 計時與評星
   private timeLimit: number = 60;
   private timeElapsed: number = 0;
   private hadMistake: boolean = false;
@@ -63,8 +61,11 @@ export class Engine {
     const initBreed = DOG_BREEDS.find(b => b.id === savedBreedId) || DOG_BREEDS[0];
     this.player.setBreed(initBreed);
 
-    // 預載像素小狗精靈圖集
-    AssetLoader.getInstance().loadImage('dog', './assets/dog/dog_spritesheet.svg');
+    // 預載全部 10 款名犬的模組化精靈圖
+    const loader = AssetLoader.getInstance();
+    DOG_BREEDS.forEach((b) => {
+      loader.loadImage(b.id, `./assets/dog/${b.id}.svg`);
+    });
 
     this.bindUICallbacks();
     this.resizeCanvas();
@@ -143,11 +144,12 @@ export class Engine {
       this.ui.showStartMenu();
     };
 
-    // 換狗回呼
+    // 換狗出戰回呼 (觸發專屬叫聲)
     this.ui.onSelectDog = (breed: DogBreed) => {
       this.player.setBreed(breed);
       StorageSystem.setSelectedDog(breed.id);
       this.syncPlayerScreenPos();
+      this.audio.playDogBark(breed.id);
       this.ui.showToast(`已指派「${breed.name}」出戰！特性：${breed.traitName}`);
     };
   }
@@ -163,7 +165,6 @@ export class Engine {
     const def = LevelManager.getLevel(levelNum);
     this.buildLanes(def);
 
-    // 紅貴賓特性：每關自動延長 8 秒時限
     let limit = def.timeLimit;
     if (this.player.currentBreed.id === 'dog_poodle') {
       limit += 8;
@@ -289,11 +290,12 @@ export class Engine {
     let nextX = this.player.gridX;
     let nextY = this.player.gridY;
 
-    // 哈士奇特性：二哈隨機狂暴大跳躍 (20% 機率向前多飛躍 1 格)
+    // 哈士奇特性：二哈隨機狂暴大跳躍
     let leapBonus = 0;
     if (this.player.currentBreed.id === 'dog_husky' && dir === 'up' && Math.random() < 0.2) {
       if (nextY + 2 < this.lanes.length) {
         leapBonus = 1;
+        this.audio.playDogBark('dog_husky');
         this.ui.showToast('❄️ 二哈狂暴發作！超遠飛躍！');
       }
     }
@@ -307,14 +309,14 @@ export class Engine {
       return;
     }
 
-    this.audio.playJump();
+    // 依據犬種體型播放差異化跳躍音調
+    this.audio.playJump(this.player.currentBreed.category);
 
     const targetPx = nextX * this.cellSize + (this.cellSize - this.player.size) / 2;
     const targetPy = (this.lanes.length - 1 - nextY) * this.cellSize + (this.cellSize - this.player.size) / 2;
 
     this.player.jumpTo(nextX, nextY, targetPx, targetPy, dir);
 
-    // 邊境牧羊犬特性：分數獲得 +25%
     const scoreFactor = this.player.currentBreed.id === 'dog_collie' ? 1.25 : 1.0;
     this.levelScore = Math.max(this.levelScore, Math.floor(nextY * 20 * scoreFactor));
   }
@@ -323,13 +325,11 @@ export class Engine {
     const currentLane = this.lanes.find(l => l.gridY === this.player.gridY);
     if (!currentLane) return;
 
-    // 1. 車輛與鐵道撞擊判定 (結合犬種專屬 hitboxRadius)
     if (currentLane.type === 'road' || currentLane.type === 'rail') {
       const pCenter = this.player.pixelX + this.player.size / 2;
       const r = this.player.hitboxRadius;
 
       for (const obs of currentLane.obstacles) {
-        // 自適應碰撞體
         const isCollided = (
           pCenter + r > obs.x &&
           pCenter - r < obs.x + obs.width &&
@@ -340,7 +340,6 @@ export class Engine {
         if (isCollided) {
           const reallyDied = this.player.die('car');
           if (!reallyDied) {
-            // 護盾或彈開生效！
             this.audio.playJump();
             this.ui.showToast('🛡️ 特性觸發！抵擋了致命碰撞！');
             return;
@@ -356,11 +355,9 @@ export class Engine {
       }
     }
 
-    // 2. 河流浮島乘載與溺水檢測 (柴犬抗水流寬鬆判定)
     if (currentLane.type === 'river') {
       if (!this.player.isJumping) {
         let onRaft = false;
-        // 柴犬拒否犬之錨：額外 +14px 安全浮島邊界
         const tolerance = this.player.currentBreed.id === 'dog_shiba' ? 18 : 6;
 
         for (const plat of currentLane.platforms) {
@@ -395,7 +392,6 @@ export class Engine {
       }
     }
 
-    // 3. 終點小吃攤位達成
     if (currentLane.type === 'goal' && !this.player.isJumping) {
       this.handleVictory(currentLane.goalFoodName);
     }
@@ -407,7 +403,6 @@ export class Engine {
     const timeUsed = this.timeElapsed;
     const timeBonus = Math.floor(Math.max(0, (this.timeLimit - timeUsed) * 25));
     
-    // 邊境牧羊犬過關加成
     const scoreFactor = this.player.currentBreed.id === 'dog_collie' ? 1.25 : 1.0;
     const scoreAdd = Math.floor((500 + timeBonus) * scoreFactor);
     this.totalScore += scoreAdd;

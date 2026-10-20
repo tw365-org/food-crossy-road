@@ -72,7 +72,6 @@ export class UIManager {
       this.ovRank.classList.add('hidden');
     });
 
-    // 🐶 名犬角色庫彈窗按鈕
     document.getElementById('btn-open-dogs')?.addEventListener('click', () => {
       this.openDogs();
     });
@@ -308,9 +307,6 @@ export class UIManager {
     });
   }
 
-  /**
-   * 打開名犬角色庫 (Dog Roster)
-   */
   public openDogs() {
     this.ovDogs.classList.remove('hidden');
     this.renderDogsList();
@@ -339,10 +335,11 @@ export class UIManager {
         btnClass = 'btn secondary dog-card-btn';
       }
 
+      // 動態像素預覽頭像 (CSS steps 踩步搖尾動畫)
       card.innerHTML = `
         <div class="dog-card-header">
-          <div class="dog-avatar" style="background-color: ${breed.themeColors.primary}; border: 2px solid ${breed.themeColors.secondary}">
-            🐶
+          <div class="dog-sprite-preview-wrap" style="background-color: ${breed.themeColors.secondary}">
+            <div class="dog-sprite-preview" style="background-image: url('./assets/dog/${breed.id}.svg')"></div>
           </div>
           <span class="dog-size-badge ${breed.category}">${breed.category}</span>
         </div>

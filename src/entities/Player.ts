@@ -56,6 +56,9 @@ export class Player {
     this.hitboxRadius = breed.hitboxRadius;
     this.jumpSpeed = breed.jumpSpeed;
 
+    // 非同步載入該犬種專屬 32x32 像素圖集
+    AssetLoader.getInstance().loadImage(breed.id, `./assets/dog/${breed.id}.svg`);
+
     // 若是黃金獵犬，賦予初始聖盾
     if (breed.id === 'dog_golden') {
       this.hasShield = true;
@@ -109,7 +112,6 @@ export class Player {
     this.jumpProgress = 0;
     this.currentPlatform = null;
 
-    // 起跳微塵粒子 (邊牧自帶藍色風流殘影)
     if (this.particleSystem) {
       this.particleSystem.emitDust(this.pixelX + this.size / 2, this.pixelY + this.size - 4, 4);
     }
@@ -124,7 +126,7 @@ export class Player {
       if (this.particleSystem) {
         this.particleSystem.emitVictory(this.pixelX + this.size / 2, this.pixelY + this.size / 2, 8);
       }
-      return false; // 免疫死亡！
+      return false;
     }
 
     // 法國鬥牛犬 30% 噸位彈開抵擋
@@ -132,7 +134,7 @@ export class Player {
       if (this.particleSystem) {
         this.particleSystem.emitDust(this.pixelX + this.size / 2, this.pixelY + this.size / 2, 6);
       }
-      return false; // 彈開成功！
+      return false;
     }
 
     this.isDead = true;
@@ -144,7 +146,7 @@ export class Player {
       this.particleSystem.emitSplash(this.pixelX + this.size / 2, this.pixelY + this.size / 2, 10);
     }
 
-    return true; // 判定真正死亡
+    return true;
   }
 
   public setVictory() {
@@ -188,15 +190,13 @@ export class Player {
   }
 
   public draw(ctx: CanvasRenderingContext2D) {
-    // 預設採用具備 10 種真實品種外觀與專屬毛色的 Procedural 渲染
-    // 若為原始台灣土黃狗且有精靈圖檔，可使用精靈圖，其餘 9 種名犬均以高規格程式化毛色、配件與專屬尺寸繪製
-    if (this.currentBreed.id === 'dog_yellow') {
-      const loader = AssetLoader.getInstance();
-      const spriteSheet = loader.getImage('dog');
-      if (spriteSheet) {
-        this.drawPixelSprite(ctx, spriteSheet);
-        return;
-      }
+    const loader = AssetLoader.getInstance();
+    // 優先讀取該犬種的專屬像素圖集
+    const spriteSheet = loader.getImage(this.currentBreed.id) || loader.getImage('dog');
+
+    if (spriteSheet) {
+      this.drawPixelSprite(ctx, spriteSheet);
+      return;
     }
 
     this.drawBreedProcedural(ctx);
@@ -244,10 +244,10 @@ export class Player {
 
     if (this.isVictory) {
       row = 4;
-      col = 2;
+      col = 2; // 歡呼
     } else if (this.isDead) {
       row = 4;
-      col = this.deathReason === 'water' ? 1 : 0;
+      col = this.deathReason === 'water' ? 1 : 0; // 0: 眩暈星星, 1: 水花
     } else {
       if (this.direction === 'up') row = 0;
       else if (this.direction === 'down') row = 1;
@@ -286,6 +286,18 @@ export class Player {
       Math.PI * 2
     );
     ctx.fill();
+
+    // 黃金獵犬金甲聖盾光圈
+    if (this.shieldActive) {
+      ctx.strokeStyle = '#F1C40F';
+      ctx.lineWidth = 3;
+      ctx.shadowColor = '#F39C12';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.arc(this.pixelX + this.size / 2, this.pixelY + this.size / 2 - jumpY, this.size * 0.55, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
 
     const drawY = this.pixelY - jumpY;
     ctx.drawImage(
