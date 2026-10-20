@@ -1,11 +1,11 @@
 import { FoodCard, FOOD_DATABASE, GachaSystem } from '../systems/GachaSystem';
 import { StorageSystem } from '../systems/StorageSystem';
 import { AudioManager } from '../core/AudioManager';
+import { DogBreed, DOG_BREEDS } from '../entities/DogBreeds';
 
 export class UIManager {
   private audio: AudioManager;
 
-  // DOM 元素快取
   private elHudLevel = document.getElementById('hud-level')!;
   private elHudTime = document.getElementById('hud-time')!;
   private elHudScore = document.getElementById('hud-score')!;
@@ -13,7 +13,6 @@ export class UIManager {
   private elTimebarFill = document.getElementById('timebar-fill')!;
   private elToast = document.getElementById('toast')!;
 
-  // Overlays
   private ovStart = document.getElementById('ov-start')!;
   private ovVictory = document.getElementById('ov-victory')!;
   private ovGameover = document.getElementById('ov-gameover')!;
@@ -21,19 +20,19 @@ export class UIManager {
   private ovDex = document.getElementById('ov-dex')!;
   private ovRank = document.getElementById('ov-rank')!;
   private ovPause = document.getElementById('ov-pause')!;
+  private ovDogs = document.getElementById('ov-dogs')!;
 
-  // 特效層
   private layerRain = document.getElementById('rain')!;
   private layerFog = document.getElementById('fog')!;
   private layerDanger = document.getElementById('danger')!;
 
-  // 回呼委派
   public onStartNormal: (() => void) | null = null;
   public onStartHell: (() => void) | null = null;
   public onNextLevel: (() => void) | null = null;
   public onRetry: (() => void) | null = null;
   public onResume: (() => void) | null = null;
   public onBackMenu: (() => void) | null = null;
+  public onSelectDog: ((breed: DogBreed) => void) | null = null;
 
   constructor(audio: AudioManager) {
     this.audio = audio;
@@ -42,7 +41,6 @@ export class UIManager {
   }
 
   private bindEvents() {
-    // 1. 開始選單按鈕
     document.getElementById('btn-start')?.addEventListener('click', () => {
       this.ovStart.classList.add('hidden');
       if (this.onStartNormal) this.onStartNormal();
@@ -74,7 +72,15 @@ export class UIManager {
       this.ovRank.classList.add('hidden');
     });
 
-    // 2. HUD 按鈕
+    // 🐶 名犬角色庫彈窗按鈕
+    document.getElementById('btn-open-dogs')?.addEventListener('click', () => {
+      this.openDogs();
+    });
+
+    document.getElementById('dogs-close')?.addEventListener('click', () => {
+      this.ovDogs.classList.add('hidden');
+    });
+
     document.getElementById('btn-sound')?.addEventListener('click', (e) => {
       const btn = e.currentTarget as HTMLButtonElement;
       const isEnabled = this.audio.toggle();
@@ -96,7 +102,6 @@ export class UIManager {
       if (this.onBackMenu) this.onBackMenu();
     });
 
-    // 3. 通關與失敗按鈕
     document.getElementById('btn-next-level')?.addEventListener('click', () => {
       this.ovVictory.classList.add('hidden');
       if (this.onNextLevel) this.onNextLevel();
@@ -112,7 +117,6 @@ export class UIManager {
       if (this.onBackMenu) this.onBackMenu();
     });
 
-    // 4. 美食抽卡按鈕
     document.getElementById('btn-draw-card')?.addEventListener('click', () => {
       this.ovVictory.classList.add('hidden');
       this.drawAndShowCard();
@@ -123,7 +127,6 @@ export class UIManager {
       if (this.onNextLevel) this.onNextLevel();
     });
 
-    // 5. 圖鑑分類篩選
     document.getElementById('dex-cat-filter')?.addEventListener('change', (e) => {
       const cat = (e.target as HTMLSelectElement).value;
       this.renderDexList(cat);
@@ -149,6 +152,7 @@ export class UIManager {
     this.ovVictory.classList.add('hidden');
     this.ovGameover.classList.add('hidden');
     this.ovPause.classList.add('hidden');
+    this.ovDogs.classList.add('hidden');
     this.setWeather('normal');
   }
 
@@ -171,7 +175,7 @@ export class UIManager {
   public showVictory(level: number, stallName: string, timeCost: number, scoreAdd: number, stars: number) {
     this.audio.playVictory();
     document.getElementById('vic-title')!.textContent = `🎉 恭喜通過第 ${level} 關！`;
-    document.getElementById('vic-summary')!.textContent = `小黃狗順利抵達了「${stallName}」美味攤位！`;
+    document.getElementById('vic-summary')!.textContent = `小狗順利抵達了「${stallName}」美味攤位！`;
     document.getElementById('vic-time')!.textContent = `${timeCost.toFixed(1)}s`;
     document.getElementById('vic-score')!.textContent = `+${scoreAdd}`;
 
@@ -202,7 +206,7 @@ export class UIManager {
     this.elToast.classList.add('show');
     setTimeout(() => {
       this.elToast.classList.remove('show');
-    }, 2200);
+    }, 2400);
   }
 
   public setWeather(weather: 'normal' | 'rain' | 'fog' | 'danger') {
@@ -301,6 +305,64 @@ export class UIManager {
         <span class="rank-score">${entry.score.toLocaleString()} 分</span>
       `;
       rankList.appendChild(li);
+    });
+  }
+
+  /**
+   * 打開名犬角色庫 (Dog Roster)
+   */
+  public openDogs() {
+    this.ovDogs.classList.remove('hidden');
+    this.renderDogsList();
+  }
+
+  private renderDogsList() {
+    const progress = StorageSystem.loadProgress();
+    const activeDogId = StorageSystem.getSelectedDogId();
+    const listEl = document.getElementById('dogs-list')!;
+    listEl.innerHTML = '';
+
+    DOG_BREEDS.forEach((breed) => {
+      const isUnlocked = progress.unlockedLevel >= breed.unlockLevel;
+      const isActive = breed.id === activeDogId;
+
+      const card = document.createElement('div');
+      card.className = `dog-card ${isActive ? 'active' : ''} ${isUnlocked ? '' : 'locked'}`;
+
+      let btnLabel = '出戰';
+      let btnClass = 'btn primary dog-card-btn';
+      if (isActive) {
+        btnLabel = '✓ 出戰中';
+        btnClass = 'btn secondary dog-card-btn';
+      } else if (!isUnlocked) {
+        btnLabel = `🔒 通關第 ${breed.unlockLevel - 1} 關解鎖`;
+        btnClass = 'btn secondary dog-card-btn';
+      }
+
+      card.innerHTML = `
+        <div class="dog-card-header">
+          <div class="dog-avatar" style="background-color: ${breed.themeColors.primary}; border: 2px solid ${breed.themeColors.secondary}">
+            🐶
+          </div>
+          <span class="dog-size-badge ${breed.category}">${breed.category}</span>
+        </div>
+        <div class="dog-name">${breed.name}</div>
+        <div class="dog-trait-title">✨ ${breed.traitName}</div>
+        <div class="dog-trait-desc">${breed.traitDesc}</div>
+        <button class="${btnClass}" ${(!isUnlocked || isActive) ? 'disabled' : ''}>${btnLabel}</button>
+      `;
+
+      const btn = card.querySelector('button');
+      if (btn && isUnlocked && !isActive) {
+        btn.addEventListener('click', () => {
+          if (this.onSelectDog) {
+            this.onSelectDog(breed);
+          }
+          this.renderDogsList();
+        });
+      }
+
+      listEl.appendChild(card);
     });
   }
 }

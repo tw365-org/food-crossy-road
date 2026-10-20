@@ -64,7 +64,7 @@
           <div class="brand-badge">🍢 台灣夜市大冒險 🧋</div>
           <h1 class="title start-title">美食過街</h1>
           <p class="body start-intro">
-            帶小黃狗穿過車道、踩著竹筏和蒸籠過河，走到對岸小吃攤就過關！
+            帶小狗穿過車道、踩著竹筏和蒸籠過河，走到對岸小吃攤就過關！
             共 10 關，每關最多拿 3 顆星；全破後進入無盡模式挑戰最高分，並解鎖地獄模式！
           </p>
           <div class="start-goals">
@@ -86,6 +86,7 @@
           <p class="caption hell-hint" id="hell-hint">通關一般模式 10 關即可解鎖地獄極速挑戰！</p>
 
           <div class="btn-row">
+            <button class="btn secondary" id="btn-open-dogs">🐕 名犬角色</button>
             <button class="btn secondary" id="btn-open-dex">📖 美食圖鑑</button>
             <button class="btn secondary" id="btn-open-rank">🏆 排行榜</button>
           </div>
@@ -101,7 +102,7 @@
             <span class="star active">★</span>
             <span class="star active">★</span>
           </div>
-          <p class="vic-summary" id="vic-summary">小黃狗順利抵達了「士林大香腸」攤位！</p>
+          <p class="vic-summary" id="vic-summary">小狗順利抵達了「士林大香腸」攤位！</p>
           <div class="vic-details">
             <div>耗時：<strong id="vic-time">18.5s</strong></div>
             <div>得分：<strong id="vic-score">+1250</strong></div>
@@ -117,7 +118,7 @@
       <section class="overlay hidden" id="ov-gameover">
         <div class="panel">
           <h2 class="heading text-danger" id="fail-title">💥 哎呀，失誤了！</h2>
-          <p class="body" id="fail-desc">小黃狗需要更敏銳地觀察車流與水流！</p>
+          <p class="body" id="fail-desc">小狗需要更敏銳地觀察車流與水流！</p>
           <div class="btn-row">
             <button class="btn primary" id="btn-retry">再試一次 🔄</button>
             <button class="btn secondary" id="btn-back-menu">返回主選單</button>
@@ -189,6 +190,20 @@
           <div class="btn-row">
             <button class="btn primary" id="btn-resume">繼續遊戲</button>
             <button class="btn secondary" id="btn-pause-menu">主選單</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 8. 名犬角色庫 Overlay -->
+      <section class="overlay hidden dex" id="ov-dogs" aria-label="名犬角色庫">
+        <div class="dex-panel dogs-panel">
+          <header class="dex-head">
+            <h2 class="heading">🐕 街頭名犬俱樂部</h2>
+            <button class="icon-btn" id="dogs-close" aria-label="關閉名犬庫">✕</button>
+          </header>
+          <p class="caption">每隻狗狗具備專屬體型比例與被動神技！通關關卡解鎖更多名犬！</p>
+          <div class="dogs-grid" id="dogs-list">
+            <!-- 動態注入 10 款狗狗卡片 -->
           </div>
         </div>
       </section>

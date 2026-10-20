@@ -4,6 +4,7 @@ export interface GameProgress {
   unlockedHell: boolean;
   collectedCardIds: string[];
   highScore: number;
+  selectedDogId?: string; // 當前選用狗狗 ID
 }
 
 export interface LeaderboardEntry {
@@ -33,7 +34,8 @@ export class StorageSystem {
       levelStars: {},
       unlockedHell: false,
       collectedCardIds: [],
-      highScore: 0
+      highScore: 0,
+      selectedDogId: 'dog_yellow'
     };
   }
 
@@ -43,6 +45,17 @@ export class StorageSystem {
     } catch {
       // 容錯
     }
+  }
+
+  public static setSelectedDog(dogId: string) {
+    const progress = this.loadProgress();
+    progress.selectedDogId = dogId;
+    this.saveProgress(progress);
+  }
+
+  public static getSelectedDogId(): string {
+    const progress = this.loadProgress();
+    return progress.selectedDogId || 'dog_yellow';
   }
 
   public static addCollectedCard(cardId: string): boolean {
@@ -58,23 +71,19 @@ export class StorageSystem {
   public static saveLevelResult(level: number, stars: number, score: number) {
     const progress = this.loadProgress();
 
-    // 更新星星
     const currentStars = progress.levelStars[level] || 0;
     if (stars > currentStars) {
       progress.levelStars[level] = stars;
     }
 
-    // 解鎖下一關
     if (level >= progress.unlockedLevel && level < 10) {
       progress.unlockedLevel = level + 1;
     }
 
-    // 若通過第 10 關，解鎖地獄模式
     if (level === 10) {
       progress.unlockedHell = true;
     }
 
-    // 更新最高分
     if (score > progress.highScore) {
       progress.highScore = score;
     }
@@ -92,7 +101,6 @@ export class StorageSystem {
       // 降級
     }
 
-    // 預設趣味榜單 (台灣夜市吃貨群英榜)
     const defaults: LeaderboardEntry[] = [
       { name: '士林夜市老饕', score: 12850, mode: 'normal', date: '2026-10-18' },
       { name: '逢甲小黃狗', score: 9820, mode: 'normal', date: '2026-10-19' },

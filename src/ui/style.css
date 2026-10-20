@@ -393,16 +393,18 @@ canvas#game-canvas {
 
 .btn-row {
   display: flex;
-  gap: 12px;
+  gap: 10px;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .btn {
   flex: 1;
-  padding: 12px 18px;
+  min-width: 90px;
+  padding: 12px 14px;
   border: none;
   border-radius: 14px;
-  font-size: 1.05rem;
+  font-size: 1rem;
   font-weight: 800;
   cursor: pointer;
   font-family: inherit;
@@ -410,7 +412,7 @@ canvas#game-canvas {
   display: inline-flex;
   justify-content: center;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   text-decoration: none;
 }
 
@@ -461,7 +463,7 @@ canvas#game-canvas {
 }
 
 .caption {
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   color: var(--text-muted);
 }
 
@@ -584,18 +586,18 @@ canvas#game-canvas {
   max-width: 280px;
 }
 
-/* 圖鑑面板 Dex */
+/* 圖鑑與名犬面板 Dex / Dogs */
 .dex-panel {
   width: 100%;
-  max-width: 520px;
+  max-width: 540px;
   max-height: 85vh;
   background: var(--panel-bg);
   border-radius: var(--radius-lg);
-  padding: 24px;
+  padding: 22px;
   box-shadow: var(--shadow);
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
 }
 
 .dex-head {
@@ -669,6 +671,98 @@ canvas#game-canvas {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 85px;
+}
+
+/* 🐕 街頭名犬卡片格線樣式 */
+.dogs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+  overflow-y: auto;
+  max-height: 58vh;
+  padding: 4px;
+}
+
+.dog-card {
+  background: #fff;
+  border: 2px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.dog-card.active {
+  border-color: #ff6b4a;
+  background: #fffaf0;
+  box-shadow: 0 4px 14px rgba(255, 107, 74, 0.2);
+}
+
+.dog-card.locked {
+  filter: grayscale(0.85);
+  opacity: 0.65;
+}
+
+.dog-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.dog-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 1.4rem;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.dog-size-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.dog-size-badge.超小型 { background: #e9d8fd; color: #6b46c1; }
+.dog-size-badge.小型 { background: #c6f6d5; color: #22543d; }
+.dog-size-badge.中型 { background: #feebc8; color: #c05621; }
+.dog-size-badge.大型 { background: #bee3f8; color: #2c5282; }
+
+.dog-name {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.dog-trait-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #dd6b20;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dog-trait-desc {
+  font-size: 0.78rem;
+  color: #718096;
+  line-height: 1.4;
+  min-height: 34px;
+}
+
+.dog-card-btn {
+  margin-top: 4px;
+  padding: 6px 12px;
+  font-size: 0.85rem;
+  border-radius: 10px;
 }
 
 /* 排行榜清單 */

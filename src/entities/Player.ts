@@ -3,6 +3,7 @@ import { ProceduralArt } from '../render/ProceduralArt';
 import { Platform } from './Platform';
 import { AssetLoader } from '../core/AssetLoader';
 import { ParticleSystem } from '../render/ParticleSystem';
+import { DogBreed, DOG_BREEDS } from './DogBreeds';
 
 export class Player {
   public gridX: number = 4;
@@ -15,13 +16,21 @@ export class Player {
   private targetPixelX: number = 0;
   private targetPixelY: number = 0;
 
-  public size: number = 42; // 像素精靈顯示尺寸
+  public size: number = 42;
+  public hitboxRadius: number = 16;
   public direction: Direction = 'up';
+
+  // 當前選用之狗狗品種
+  public currentBreed: DogBreed = DOG_BREEDS[0];
+
+  // 品種被動特異狀態
+  public hasShield: boolean = false;           // 黃金獵犬聖盾
+  public shieldActive: boolean = false;
 
   // 平滑跳躍與彈跳動畫參數
   public isJumping: boolean = false;
   private jumpProgress: number = 0;
-  private readonly jumpSpeed: number = 8.0;
+  private jumpSpeed: number = 8.0;
   private readonly maxJumpHeight: number = 24;
 
   // 乘載浮島物理
@@ -33,14 +42,28 @@ export class Player {
   public deathTimer: number = 0;
   public isVictory: boolean = false;
 
-  // 待機眨眼與搖尾計時器
   private idleTimer: number = 0;
-
-  // 外部粒子系統委派
   public particleSystem: ParticleSystem | null = null;
 
   constructor(initialGridX: number = 4, initialGridY: number = 0) {
+    this.setBreed(DOG_BREEDS[0]);
     this.reset(initialGridX, initialGridY);
+  }
+
+  public setBreed(breed: DogBreed) {
+    this.currentBreed = breed;
+    this.size = breed.renderSize;
+    this.hitboxRadius = breed.hitboxRadius;
+    this.jumpSpeed = breed.jumpSpeed;
+
+    // 若是黃金獵犬，賦予初始聖盾
+    if (breed.id === 'dog_golden') {
+      this.hasShield = true;
+      this.shieldActive = true;
+    } else {
+      this.hasShield = false;
+      this.shieldActive = false;
+    }
   }
 
   public reset(gridX: number = 4, gridY: number = 0) {
@@ -55,6 +78,10 @@ export class Player {
     this.isVictory = false;
     this.currentPlatform = null;
     this.idleTimer = 0;
+
+    if (this.currentBreed.id === 'dog_golden') {
+      this.shieldActive = true;
+    }
   }
 
   public setScreenPosition(x: number, y: number) {
@@ -82,23 +109,42 @@ export class Player {
     this.jumpProgress = 0;
     this.currentPlatform = null;
 
-    // 起跳微塵粒子
+    // 起跳微塵粒子 (邊牧自帶藍色風流殘影)
     if (this.particleSystem) {
       this.particleSystem.emitDust(this.pixelX + this.size / 2, this.pixelY + this.size - 4, 4);
     }
   }
 
-  public die(reason: 'car' | 'water' | 'timeout') {
-    if (this.isDead) return;
+  public die(reason: 'car' | 'water' | 'timeout'): boolean {
+    if (this.isDead) return false;
+
+    // 黃金獵犬聖盾抵擋致命一擊
+    if (this.shieldActive && reason !== 'timeout') {
+      this.shieldActive = false;
+      if (this.particleSystem) {
+        this.particleSystem.emitVictory(this.pixelX + this.size / 2, this.pixelY + this.size / 2, 8);
+      }
+      return false; // 免疫死亡！
+    }
+
+    // 法國鬥牛犬 30% 噸位彈開抵擋
+    if (this.currentBreed.id === 'dog_frenchie' && reason === 'car' && Math.random() < 0.3) {
+      if (this.particleSystem) {
+        this.particleSystem.emitDust(this.pixelX + this.size / 2, this.pixelY + this.size / 2, 6);
+      }
+      return false; // 彈開成功！
+    }
+
     this.isDead = true;
     this.deathReason = reason;
     this.deathTimer = 0;
     this.currentPlatform = null;
 
-    // 落水水花噴濺
     if (reason === 'water' && this.particleSystem) {
       this.particleSystem.emitSplash(this.pixelX + this.size / 2, this.pixelY + this.size / 2, 10);
     }
+
+    return true; // 判定真正死亡
   }
 
   public setVictory() {
@@ -131,7 +177,6 @@ export class Player {
         this.pixelX = this.targetPixelX;
         this.pixelY = this.targetPixelY;
 
-        // 著地時的灰塵回彈粒子
         if (this.particleSystem) {
           this.particleSystem.emitDust(this.pixelX + this.size / 2, this.pixelY + this.size - 4, 3);
         }
@@ -143,101 +188,21 @@ export class Player {
   }
 
   public draw(ctx: CanvasRenderingContext2D) {
-    const loader = AssetLoader.getInstance();
-    const spriteSheet = loader.getImage('dog');
-
-    // 若圖片未載入完成或載入失敗，以原版 Procedural 向量繪圖無縫降級兜底
-    if (!spriteSheet) {
-      this.drawProceduralFallback(ctx);
-      return;
-    }
-
-    this.drawPixelSprite(ctx, spriteSheet);
-  }
-
-  /**
-   * 像素精靈圖繪製 (支援 4 方向、跳躍動態與狀態機)
-   */
-  private drawPixelSprite(ctx: CanvasRenderingContext2D, sprite: HTMLImageElement) {
-    const frameW = 32;
-    const frameH = 32;
-
-    let row = 0;
-    let col = 0;
-
-    // 1. 決定精靈圖的列 (Row) 與欄 (Col)
-    if (this.isVictory) {
-      row = 4;
-      col = 2; // 歡呼勝利高舉雙爪
-    } else if (this.isDead) {
-      row = 4;
-      col = this.deathReason === 'water' ? 1 : 0; // 0: 眩暈星星, 1: 水波狗頭
-    } else {
-      // 四方向判定
-      if (this.direction === 'up') row = 0;
-      else if (this.direction === 'down') row = 1;
-      else if (this.direction === 'left') row = 2;
-      else if (this.direction === 'right') row = 3;
-
-      // 動作幀判定
-      if (this.isJumping) {
-        // 跳躍時依進度播放起跳(1)、滯空(2)、收腿著地(3)
-        if (this.jumpProgress < 0.3) col = 1;
-        else if (this.jumpProgress < 0.7) col = 2;
-        else col = 3;
-      } else {
-        // 待機時微幅搖尾 / 眨眼 (每 2 秒一次)
-        const idleCycle = Math.floor(this.idleTimer * 3) % 8;
-        col = (idleCycle === 0 || idleCycle === 1) ? 1 : 0;
+    // 預設採用具備 10 種真實品種外觀與專屬毛色的 Procedural 渲染
+    // 若為原始台灣土黃狗且有精靈圖檔，可使用精靈圖，其餘 9 種名犬均以高規格程式化毛色、配件與專屬尺寸繪製
+    if (this.currentBreed.id === 'dog_yellow') {
+      const loader = AssetLoader.getInstance();
+      const spriteSheet = loader.getImage('dog');
+      if (spriteSheet) {
+        this.drawPixelSprite(ctx, spriteSheet);
+        return;
       }
     }
 
-    // 計算拋物線跳躍高度
-    let jumpY = 0;
-    if (this.isJumping) {
-      jumpY = Math.sin(this.jumpProgress * Math.PI) * this.maxJumpHeight;
-    }
-
-    ctx.save();
-    // 保持像素風格邊緣清晰
-    ctx.imageSmoothingEnabled = false;
-
-    // 繪製地面影子
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
-    ctx.beginPath();
-    const shadowScale = Math.max(0.4, 1 - jumpY / 45);
-    ctx.ellipse(
-      this.pixelX + this.size / 2,
-      this.pixelY + this.size - 4,
-      (this.size * 0.35) * shadowScale,
-      (this.size * 0.16) * shadowScale,
-      0,
-      0,
-      Math.PI * 2
-    );
-    ctx.fill();
-
-    // 繪製本體 (加上跳躍高度位移)
-    const drawY = this.pixelY - jumpY;
-    ctx.drawImage(
-      sprite,
-      col * frameW,
-      row * frameH,
-      frameW,
-      frameH,
-      this.pixelX,
-      drawY,
-      this.size,
-      this.size
-    );
-
-    ctx.restore();
+    this.drawBreedProcedural(ctx);
   }
 
-  /**
-   * 向量降級繪製
-   */
-  private drawProceduralFallback(ctx: CanvasRenderingContext2D) {
+  private drawBreedProcedural(ctx: CanvasRenderingContext2D) {
     let jumpHeight = 0;
     let squashX = 1;
     let squashY = 1;
@@ -264,7 +229,77 @@ export class Player {
       this.direction,
       jumpHeight,
       squashX,
-      squashY
+      squashY,
+      this.currentBreed,
+      this.shieldActive
     );
+  }
+
+  private drawPixelSprite(ctx: CanvasRenderingContext2D, sprite: HTMLImageElement) {
+    const frameW = 32;
+    const frameH = 32;
+
+    let row = 0;
+    let col = 0;
+
+    if (this.isVictory) {
+      row = 4;
+      col = 2;
+    } else if (this.isDead) {
+      row = 4;
+      col = this.deathReason === 'water' ? 1 : 0;
+    } else {
+      if (this.direction === 'up') row = 0;
+      else if (this.direction === 'down') row = 1;
+      else if (this.direction === 'left') row = 2;
+      else if (this.direction === 'right') row = 3;
+
+      if (this.isJumping) {
+        if (this.jumpProgress < 0.3) col = 1;
+        else if (this.jumpProgress < 0.7) col = 2;
+        else col = 3;
+      } else {
+        const idleCycle = Math.floor(this.idleTimer * 3) % 8;
+        col = (idleCycle === 0 || idleCycle === 1) ? 1 : 0;
+      }
+    }
+
+    let jumpY = 0;
+    if (this.isJumping) {
+      jumpY = Math.sin(this.jumpProgress * Math.PI) * this.maxJumpHeight;
+    }
+
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+
+    // 地面影子
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+    ctx.beginPath();
+    const shadowScale = Math.max(0.4, 1 - jumpY / 45);
+    ctx.ellipse(
+      this.pixelX + this.size / 2,
+      this.pixelY + this.size - 4,
+      (this.size * 0.35) * shadowScale,
+      (this.size * 0.16) * shadowScale,
+      0,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+
+    const drawY = this.pixelY - jumpY;
+    ctx.drawImage(
+      sprite,
+      col * frameW,
+      row * frameH,
+      frameW,
+      frameH,
+      this.pixelX,
+      drawY,
+      this.size,
+      this.size
+    );
+
+    ctx.restore();
   }
 }
