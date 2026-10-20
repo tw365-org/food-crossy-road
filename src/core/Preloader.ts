@@ -20,7 +20,12 @@ export class Preloader {
   private tipInterval: number | null = null;
   private currentProgress: number = 0;
 
-  constructor() {}
+  constructor() {
+    const dogSprite = document.querySelector<HTMLElement>('.preloader-dog-sprite');
+    if (dogSprite) {
+      dogSprite.style.backgroundImage = "url('./assets/dog/dog_yellow.svg')";
+    }
+  }
 
   /**
    * 啟動資源預載與進度追蹤

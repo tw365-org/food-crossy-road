@@ -78,7 +78,6 @@ html, body {
 .preloader-dog-sprite {
   width: 64px;
   height: 64px;
-  background-image: url('./assets/dog/dog_yellow.svg');
   background-size: 256px 320px; /* 4 cols * 64px, 5 rows * 64px */
   background-position: 0px -64px; /* 第 1 列：面向前方奔跑 */
   image-rendering: pixelated;

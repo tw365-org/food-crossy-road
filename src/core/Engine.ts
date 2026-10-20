@@ -40,6 +40,7 @@ export class Engine {
 
   private cameraY: number = 0;
   private lastTime: number = 0;
+  private gameOverTimer: number | null = null;
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -86,8 +87,27 @@ export class Engine {
     this.canvas.style.height = `${Math.floor(this.stageHeight * scale)}px`;
   }
 
+  private clearGameOverTimer() {
+    if (this.gameOverTimer !== null) {
+      clearTimeout(this.gameOverTimer);
+      this.gameOverTimer = null;
+    }
+  }
+
+  private scheduleGameOver(reason: string, delayMs: number = 800) {
+    this.clearGameOverTimer();
+    this.gameOverTimer = window.setTimeout(() => {
+      if (this.state === 'PLAYING') {
+        this.state = 'GAMEOVER';
+        this.ui.showGameOver(reason);
+      }
+      this.gameOverTimer = null;
+    }, delayMs);
+  }
+
   private bindUICallbacks() {
     this.ui.onStartNormal = () => {
+      this.clearGameOverTimer();
       this.currentMode = 'normal';
       this.currentLevel = 1;
       this.totalScore = 0;
@@ -96,6 +116,7 @@ export class Engine {
     };
 
     this.ui.onStartHell = () => {
+      this.clearGameOverTimer();
       this.currentMode = 'hell';
       this.currentLevel = 1;
       this.totalScore = 0;
@@ -104,6 +125,7 @@ export class Engine {
     };
 
     this.ui.onNextLevel = () => {
+      this.clearGameOverTimer();
       if (this.currentMode === 'normal') {
         if (this.currentLevel < 10) {
           this.currentLevel++;
@@ -119,6 +141,7 @@ export class Engine {
     };
 
     this.ui.onRetry = () => {
+      this.clearGameOverTimer();
       if (this.currentMode === 'normal') {
         this.hadMistake = true;
         this.startLevel(this.currentLevel);
@@ -140,6 +163,7 @@ export class Engine {
     };
 
     this.ui.onBackMenu = () => {
+      this.clearGameOverTimer();
       this.state = 'START';
       this.ui.showStartMenu();
     };
@@ -156,12 +180,14 @@ export class Engine {
 
   private togglePause() {
     if (this.state === 'PLAYING') {
+      this.clearGameOverTimer();
       this.state = 'PAUSED';
       this.ui.showPause();
     }
   }
 
   public startLevel(levelNum: number) {
+    this.clearGameOverTimer();
     const def = LevelManager.getLevel(levelNum);
     this.buildLanes(def);
 
@@ -183,6 +209,7 @@ export class Engine {
   }
 
   public startHellMode() {
+    this.clearGameOverTimer();
     const lanesConfig = LevelManager.generateHellLanes(20);
     let limit = Math.max(25, 45 - this.currentLevel);
     if (this.player.currentBreed.id === 'dog_poodle') {
@@ -257,10 +284,7 @@ export class Engine {
 
     if (timeLeft <= 0 && !this.player.isDead) {
       this.player.die('timeout');
-      setTimeout(() => {
-        this.state = 'GAMEOVER';
-        this.ui.showGameOver('⏰ 時間用盡！夜市攤位打烊了！');
-      }, 1000);
+      this.scheduleGameOver('⏰ 時間用盡！夜市攤位打烊了！', 1000);
       return;
     }
 
@@ -326,18 +350,8 @@ export class Engine {
     if (!currentLane) return;
 
     if (currentLane.type === 'road' || currentLane.type === 'rail') {
-      const pCenter = this.player.pixelX + this.player.size / 2;
-      const r = this.player.hitboxRadius;
-
       for (const obs of currentLane.obstacles) {
-        const isCollided = (
-          pCenter + r > obs.x &&
-          pCenter - r < obs.x + obs.width &&
-          this.player.pixelY + this.player.size > obs.y + 4 &&
-          this.player.pixelY < obs.y + obs.height - 4
-        );
-
-        if (isCollided) {
+        if (obs.collidesWith(this.player.pixelX, this.player.pixelY, this.player.size, this.player.hitboxRadius)) {
           const reallyDied = this.player.die('car');
           if (!reallyDied) {
             this.audio.playJump();
@@ -346,10 +360,7 @@ export class Engine {
           }
 
           this.audio.playHit();
-          setTimeout(() => {
-            this.state = 'GAMEOVER';
-            this.ui.showGameOver(obs.type === 'train' ? '💥 被疾駛的火車撞倒了！' : '💥 哎呀，被迎面的車輛撞上了！');
-          }, 800);
+          this.scheduleGameOver(obs.type === 'train' ? '💥 被疾駛的火車撞倒了！' : '💥 哎呀，被迎面的車輛撞上了！', 800);
           return;
         }
       }
@@ -361,14 +372,7 @@ export class Engine {
         const tolerance = this.player.currentBreed.id === 'dog_shiba' ? 18 : 6;
 
         for (const plat of currentLane.platforms) {
-          const centerX = this.player.pixelX + this.player.size / 2;
-          const centerY = this.player.pixelY + this.player.size / 2;
-          if (
-            centerX >= plat.x - tolerance &&
-            centerX <= plat.x + plat.width + tolerance &&
-            centerY >= plat.y - 4 &&
-            centerY <= plat.y + plat.height + 4
-          ) {
+          if (plat.contains(this.player.pixelX, this.player.pixelY, this.player.size, tolerance)) {
             onRaft = true;
             this.player.currentPlatform = plat;
             break;
@@ -383,10 +387,7 @@ export class Engine {
           }
 
           this.audio.playSplash();
-          setTimeout(() => {
-            this.state = 'GAMEOVER';
-            this.ui.showGameOver('💦 撲通！掉進河裡了，請踩著竹筏過河！');
-          }, 800);
+          this.scheduleGameOver('💦 撲通！掉進河裡了，請踩著竹筏過河！', 800);
           return;
         }
       }
@@ -398,6 +399,7 @@ export class Engine {
   }
 
   private handleVictory(stallName: string) {
+    this.clearGameOverTimer();
     this.state = 'VICTORY';
     this.player.setVictory();
     const timeUsed = this.timeElapsed;

@@ -200,11 +200,18 @@ export class UIManager {
     this.ovPause.classList.remove('hidden');
   }
 
+  private toastTimeoutId: number | null = null;
+
   public showToast(msg: string) {
+    if (this.toastTimeoutId !== null) {
+      clearTimeout(this.toastTimeoutId);
+      this.toastTimeoutId = null;
+    }
     this.elToast.textContent = msg;
     this.elToast.classList.add('show');
-    setTimeout(() => {
+    this.toastTimeoutId = window.setTimeout(() => {
       this.elToast.classList.remove('show');
+      this.toastTimeoutId = null;
     }, 2400);
   }
 
@@ -298,11 +305,25 @@ export class UIManager {
     ranks.forEach((entry, idx) => {
       const li = document.createElement('li');
       li.className = 'rank-item';
-      li.innerHTML = `
-        <span class="rank-badge">#${idx + 1}</span>
-        <span class="rank-name">${entry.name} <small style="color:#718096">(${entry.mode === 'hell' ? '地獄' : '一般'})</small></span>
-        <span class="rank-score">${entry.score.toLocaleString()} 分</span>
-      `;
+
+      const badgeSpan = document.createElement('span');
+      badgeSpan.className = 'rank-badge';
+      badgeSpan.textContent = `#${idx + 1}`;
+
+      const nameSpan = document.createElement('span');
+      nameSpan.className = 'rank-name';
+      nameSpan.textContent = `${entry.name} `;
+
+      const modeSmall = document.createElement('small');
+      modeSmall.style.color = '#718096';
+      modeSmall.textContent = `(${entry.mode === 'hell' ? '地獄' : '一般'})`;
+      nameSpan.appendChild(modeSmall);
+
+      const scoreSpan = document.createElement('span');
+      scoreSpan.className = 'rank-score';
+      scoreSpan.textContent = `${entry.score.toLocaleString()} 分`;
+
+      li.append(badgeSpan, nameSpan, scoreSpan);
       rankList.appendChild(li);
     });
   }

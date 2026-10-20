@@ -239,17 +239,66 @@ test('【排行榜回歸】排行榜紀錄按分數由高至低自動嚴格排�
 });
 
 // 測試群組 6: 幾何碰撞演算法回歸 (Physics & Collisions)
-test('【碰撞檢測】車輛 AABB 碰撞檢測運算精確', () => {
+test('【碰撞檢測】車輛 AABB 碰撞檢測運算精確且支援犬種專屬判定半徑', () => {
   const car = new Obstacle(100, 200, 60, 40, 100, 'car');
 
+  // 標準包圍盒判定 (無 hitboxRadius 引數)
   assert.equal(car.collidesWith(120, 210, 36), true, '重疊區域應判定為碰撞');
   assert.equal(car.collidesWith(300, 200, 36), false, '遠離區域不應判定碰撞');
   assert.equal(car.collidesWith(120, 350, 36), false, '不同高度不應判定碰撞');
+
+  // 微型化犬種半徑檢測 (吉娃娃 10px vs 金毛 18px)
+  // 車輛 X: 100..160。角色 X: 65, 寬度: 36 => 角色中心點: 83 (距離車輛邊緣 17px)
+  const px = 65;
+  const py = 205;
+  const pSize = 36;
+  // 吉娃娃半徑 10px: 中心點 83 + 10 = 93 < 100 (不碰撞，成功穿梭過車縫！)
+  assert.equal(car.collidesWith(px, py, pSize, 10), false, '吉娃娃微型半徑在車縫間不應判定碰撞');
+  // 金毛半徑 18px: 中心點 83 + 18 = 101 > 100 (碰撞！)
+  assert.equal(car.collidesWith(px, py, pSize, 18), true, '大型犬較大半徑在邊界處應判定碰撞');
 });
 
-test('【浮台檢測】河流竹筏乘載範圍判定符合邊界寬容度', () => {
+test('【浮台檢測】河流竹筏乘載範圍判定符合邊界寬容度且支援拒否犬特性', () => {
   const raft = new Platform(100, 150, 90, 44, 80, 'raft');
 
   assert.equal(raft.contains(120, 140, 40), true, '竹筏中央應判定在浮台上');
   assert.equal(raft.contains(300, 140, 40), false, '離開竹筏應判定不在浮台上');
+
+  // 測試柴犬 18px 寬容度 vs 標準 6px 寬容度
+  // 竹筏 X: 100..190。若角色中心點位於 198 (超出右邊緣 8px)
+  // 角色 X: 178, pSize: 40 => 中心點 198
+  const edgePx = 178;
+  const edgePy = 152;
+  const pSize = 40;
+  assert.equal(raft.contains(edgePx, edgePy, pSize, 6), false, '標準犬種超出 6px 邊界應判定落水');
+  assert.equal(raft.contains(edgePx, edgePy, pSize, 18), true, '柴犬具備 18px 寬容度應判定穩固站立於竹筏上');
+});
+
+// 測試群組 7: 防禦性反序列化安全回歸 (Defensive Deserialization & Robustness)
+test('【存檔機制】舊版本殘留或毀損存檔具備防禦性反序列化修復力', () => {
+  for (const k in mockStorage) delete mockStorage[k];
+
+  // 1. 舊版缺少 levelStars 與 selectedDogId 的不完整存檔
+  mockStorage['food_crossy_road_save_v1'] = JSON.stringify({
+    highScore: 888
+  });
+
+  const legacyProgress = StorageSystem.loadProgress();
+  assert.equal(legacyProgress.highScore, 888);
+  assert.equal(legacyProgress.unlockedLevel, 1, '缺少 unlockedLevel 應自動補齊預設值 1');
+  assert.deepEqual(legacyProgress.levelStars, {}, '缺少 levelStars 應自動補齊空物件避免崩潰');
+  assert.equal(legacyProgress.selectedDogId, 'dog_yellow', '缺少 selectedDogId 應自動退回初始黃狗');
+
+  // 驗證進行存檔不會報錯
+  assert.doesNotThrow(() => {
+    StorageSystem.saveLevelResult(1, 3, 1000);
+  });
+  const updated = StorageSystem.loadProgress();
+  assert.equal(updated.levelStars[1], 3);
+
+  // 2. 存檔字串損壞 (非合法 JSON)
+  mockStorage['food_crossy_road_save_v1'] = '{bad-json-corrupted}';
+  const fallbackProgress = StorageSystem.loadProgress();
+  assert.equal(fallbackProgress.unlockedLevel, 1);
+  assert.equal(fallbackProgress.selectedDogId, 'dog_yellow');
 });

@@ -46,9 +46,23 @@ export class Obstacle {
   }
 
   /**
-   * AABB 碰撞檢測 (留有 4px 邊界緩衝，避免誤判造成挫折感)
+   * 碰撞檢測：支援犬種專屬半徑判定箱或標準邊界緩衝
+   * @param px 角色左上角 X
+   * @param py 角色左上角 Y
+   * @param pSize 角色尺寸
+   * @param hitboxRadius 可選：犬種專屬判定半徑 (如吉娃娃 10px、金毛 18px)
    */
-  public collidesWith(px: number, py: number, pSize: number): boolean {
+  public collidesWith(px: number, py: number, pSize: number, hitboxRadius?: number): boolean {
+    if (typeof hitboxRadius === 'number') {
+      const pCenter = px + pSize / 2;
+      return (
+        pCenter + hitboxRadius > this.x &&
+        pCenter - hitboxRadius < this.x + this.width &&
+        py + pSize > this.y + 4 &&
+        py < this.y + this.height - 4
+      );
+    }
+
     const pad = 6;
     return (
       px + pad < this.x + this.width &&

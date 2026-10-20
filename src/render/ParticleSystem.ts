@@ -97,8 +97,10 @@ export class ParticleSystem {
   }
 
   public draw(ctx: CanvasRenderingContext2D) {
+    if (this.particles.length === 0) return;
+
+    ctx.save();
     for (const p of this.particles) {
-      ctx.save();
       ctx.globalAlpha = p.alpha;
       ctx.fillStyle = p.color;
 
@@ -113,9 +115,8 @@ export class ParticleSystem {
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
       }
-
-      ctx.restore();
     }
+    ctx.restore();
   }
 
   public clear() {

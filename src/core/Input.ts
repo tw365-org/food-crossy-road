@@ -87,8 +87,8 @@ export class InputManager {
     dpadButtons.forEach((btn) => {
       btn.addEventListener('pointerdown', (e) => {
         e.preventDefault();
-        const dir = btn.getAttribute('data-dir') as Direction;
-        if (dir) {
+        const dir = btn.getAttribute('data-dir');
+        if (dir === 'up' || dir === 'down' || dir === 'left' || dir === 'right') {
           this.queueMove(dir);
         }
       });

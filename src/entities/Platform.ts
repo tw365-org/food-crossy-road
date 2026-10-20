@@ -47,15 +47,18 @@ export class Platform {
   }
 
   /**
-   * 判定黃狗是否在浮台上
+   * 判定角色是否乘載於浮台上
+   * @param px 角色左上角 X
+   * @param py 角色左上角 Y
+   * @param pSize 角色尺寸
+   * @param tolerance 可選：邊界寬容度 (如柴犬拒否犬抗水流特性可達 18px，預設 6px)
    */
-  public contains(px: number, py: number, pSize: number): boolean {
+  public contains(px: number, py: number, pSize: number, tolerance: number = 6): boolean {
     const centerX = px + pSize / 2;
     const centerY = py + pSize / 2;
-    // 寬裕容錯範圍 (+/- 6px)
     return (
-      centerX >= this.x - 6 &&
-      centerX <= this.x + this.width + 6 &&
+      centerX >= this.x - tolerance &&
+      centerX <= this.x + this.width + tolerance &&
       centerY >= this.y - 4 &&
       centerY <= this.y + this.height + 4
     );

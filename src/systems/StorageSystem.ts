@@ -23,7 +23,17 @@ export class StorageSystem {
     try {
       const raw = localStorage.getItem(this.STORAGE_KEY);
       if (raw) {
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object') {
+          return {
+            unlockedLevel: typeof parsed.unlockedLevel === 'number' ? parsed.unlockedLevel : 1,
+            levelStars: (parsed.levelStars && typeof parsed.levelStars === 'object') ? parsed.levelStars : {},
+            unlockedHell: Boolean(parsed.unlockedHell),
+            collectedCardIds: Array.isArray(parsed.collectedCardIds) ? parsed.collectedCardIds : [],
+            highScore: typeof parsed.highScore === 'number' ? parsed.highScore : 0,
+            selectedDogId: typeof parsed.selectedDogId === 'string' ? parsed.selectedDogId : 'dog_yellow'
+          };
+        }
       }
     } catch {
       // 容錯降級
@@ -95,7 +105,10 @@ export class StorageSystem {
     try {
       const raw = localStorage.getItem(this.LEADERBOARD_KEY);
       if (raw) {
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter(item => item && typeof item.score === 'number' && typeof item.name === 'string');
+        }
       }
     } catch {
       // 降級
