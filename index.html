@@ -14,6 +14,25 @@
     <link rel="stylesheet" href="/src/ui/style.css" />
   </head>
   <body>
+    <!-- 專業遊戲載入畫面 Preloader -->
+    <div id="preloader" class="preloader">
+      <div class="preloader-content">
+        <div class="preloader-dog">
+          <div class="preloader-dog-sprite"></div>
+          <div class="preloader-dust"></div>
+        </div>
+        <div class="brand-badge">🍢 台灣夜市大冒險 🧋</div>
+        <h1 class="preloader-title">美食過街</h1>
+        <div class="preloader-bar-wrap">
+          <div class="preloader-bar" id="preloader-fill"></div>
+        </div>
+        <div class="preloader-meta">
+          <span class="preloader-tip" id="preloader-tip">🏮 正在點亮夜市大紅燈籠...</span>
+          <span class="preloader-pct" id="preloader-pct">0%</span>
+        </div>
+      </div>
+    </div>
+
     <main id="stage">
       <!-- 遊戲 Canvas 渲染層 -->
       <div id="game-container">
@@ -202,9 +221,7 @@
             <button class="icon-btn" id="dogs-close" aria-label="關閉名犬庫">✕</button>
           </header>
           <p class="caption">每隻狗狗具備專屬體型比例與被動神技！通關關卡解鎖更多名犬！</p>
-          <div class="dogs-grid" id="dogs-list">
-            <!-- 動態注入 10 款狗狗卡片 -->
-          </div>
+          <div class="dogs-grid" id="dogs-list"></div>
         </div>
       </section>
     </main>

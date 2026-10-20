@@ -33,6 +33,120 @@ html, body {
   color: var(--text-main);
 }
 
+/* 專業遊戲載入畫面 Preloader */
+.preloader {
+  position: fixed;
+  inset: 0;
+  background-color: var(--bg-color);
+  background-image: radial-gradient(circle at center, #d8eef0 0%, #c7e3e6 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.5s;
+}
+
+.preloader.fade-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.preloader-content {
+  width: 90%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 14px;
+  animation: preloaderIn 0.5s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+}
+
+@keyframes preloaderIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.preloader-dog {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  margin-bottom: 4px;
+}
+
+.preloader-dog-sprite {
+  width: 64px;
+  height: 64px;
+  background-image: url('./assets/dog/dog_yellow.svg');
+  background-size: 256px 320px; /* 4 cols * 64px, 5 rows * 64px */
+  background-position: 0px -64px; /* 第 1 列：面向前方奔跑 */
+  image-rendering: pixelated;
+  image-rendering: -moz-crisp-edges;
+  animation: preloaderTrot 0.6s steps(4) infinite, preloaderBounce 0.3s ease-in-out infinite alternate;
+}
+
+@keyframes preloaderTrot {
+  from { background-position-x: 0px; }
+  to { background-position-x: -256px; }
+}
+
+@keyframes preloaderBounce {
+  from { transform: translateY(0); }
+  to { transform: translateY(-6px); }
+}
+
+.preloader-title {
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: #2b6cb0;
+  letter-spacing: 1px;
+}
+
+.preloader-bar-wrap {
+  width: 100%;
+  height: 14px;
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 20px;
+  padding: 3px;
+  box-shadow: inset 0 2px 4px rgba(0,0,0,0.1);
+  overflow: hidden;
+}
+
+.preloader-bar {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #48bb78, #ecc94b, #ff6b4a);
+  border-radius: 12px;
+  transition: width 0.18s ease-out;
+  box-shadow: 0 0 8px rgba(255, 107, 74, 0.5);
+}
+
+.preloader-meta {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #4a5568;
+}
+
+.preloader-tip {
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 82%;
+  color: #718096;
+}
+
+.preloader-pct {
+  color: var(--primary);
+  font-weight: 800;
+}
+
+/* 主遊戲舞台 */
 #stage {
   position: relative;
   width: 100vw;
@@ -728,8 +842,8 @@ canvas#game-canvas {
 .dog-sprite-preview {
   width: 40px;
   height: 40px;
-  background-size: 160px 200px; /* 4 cols * 40px, 5 rows * 40px */
-  background-position: 0px -40px; /* 第 1 列：面向前方 Down */
+  background-size: 160px 200px;
+  background-position: 0px -40px;
   image-rendering: pixelated;
   image-rendering: -moz-crisp-edges;
   animation: dogTrot 0.7s steps(4) infinite;
