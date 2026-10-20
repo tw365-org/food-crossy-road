@@ -1,10 +1,12 @@
 import { Direction } from '../core/Input';
 import { ProceduralArt } from '../render/ProceduralArt';
 import { Platform } from './Platform';
+import { AssetLoader } from '../core/AssetLoader';
+import { ParticleSystem } from '../render/ParticleSystem';
 
 export class Player {
   public gridX: number = 4;
-  public gridY: number = 0; // 0 表示起點行 (最下方)
+  public gridY: number = 0;
   
   public pixelX: number = 0;
   public pixelY: number = 0;
@@ -13,14 +15,14 @@ export class Player {
   private targetPixelX: number = 0;
   private targetPixelY: number = 0;
 
-  public size: number = 38;
+  public size: number = 42; // 像素精靈顯示尺寸
   public direction: Direction = 'up';
 
   // 平滑跳躍與彈跳動畫參數
   public isJumping: boolean = false;
   private jumpProgress: number = 0;
-  private readonly jumpSpeed: number = 7.5; // 約 130ms 完成一跳
-  private readonly maxJumpHeight: number = 22;
+  private readonly jumpSpeed: number = 8.0;
+  private readonly maxJumpHeight: number = 24;
 
   // 乘載浮島物理
   public currentPlatform: Platform | null = null;
@@ -29,6 +31,13 @@ export class Player {
   public isDead: boolean = false;
   public deathReason: 'car' | 'water' | 'timeout' | null = null;
   public deathTimer: number = 0;
+  public isVictory: boolean = false;
+
+  // 待機眨眼與搖尾計時器
+  private idleTimer: number = 0;
+
+  // 外部粒子系統委派
+  public particleSystem: ParticleSystem | null = null;
 
   constructor(initialGridX: number = 4, initialGridY: number = 0) {
     this.reset(initialGridX, initialGridY);
@@ -43,7 +52,9 @@ export class Player {
     this.isDead = false;
     this.deathReason = null;
     this.deathTimer = 0;
+    this.isVictory = false;
     this.currentPlatform = null;
+    this.idleTimer = 0;
   }
 
   public setScreenPosition(x: number, y: number) {
@@ -55,11 +66,8 @@ export class Player {
     this.targetPixelY = y;
   }
 
-  /**
-   * 觸發跳向新網格
-   */
   public jumpTo(nextGridX: number, nextGridY: number, targetX: number, targetY: number, dir: Direction) {
-    if (this.isDead) return;
+    if (this.isDead || this.isVictory) return;
 
     this.direction = dir;
     this.gridX = nextGridX;
@@ -72,7 +80,12 @@ export class Player {
 
     this.isJumping = true;
     this.jumpProgress = 0;
-    this.currentPlatform = null; // 跳躍瞬間離開浮台
+    this.currentPlatform = null;
+
+    // 起跳微塵粒子
+    if (this.particleSystem) {
+      this.particleSystem.emitDust(this.pixelX + this.size / 2, this.pixelY + this.size - 4, 4);
+    }
   }
 
   public die(reason: 'car' | 'water' | 'timeout') {
@@ -81,22 +94,34 @@ export class Player {
     this.deathReason = reason;
     this.deathTimer = 0;
     this.currentPlatform = null;
+
+    // 落水水花噴濺
+    if (reason === 'water' && this.particleSystem) {
+      this.particleSystem.emitSplash(this.pixelX + this.size / 2, this.pixelY + this.size / 2, 10);
+    }
+  }
+
+  public setVictory() {
+    this.isVictory = true;
+    if (this.particleSystem) {
+      this.particleSystem.emitVictory(this.pixelX + this.size / 2, this.pixelY + this.size / 2, 12);
+    }
   }
 
   public update(dt: number) {
+    this.idleTimer += dt;
+
     if (this.isDead) {
       this.deathTimer += dt;
       return;
     }
 
-    // 隨竹筏/蒸籠浮動
     if (this.currentPlatform && !this.isJumping) {
       this.pixelX += this.currentPlatform.speed * dt;
       this.targetPixelX = this.pixelX;
       this.startPixelX = this.pixelX;
     }
 
-    // 跳躍補間動畫 (拋物線與彈性形變)
     if (this.isJumping) {
       this.jumpProgress += this.jumpSpeed * dt;
 
@@ -105,8 +130,12 @@ export class Player {
         this.isJumping = false;
         this.pixelX = this.targetPixelX;
         this.pixelY = this.targetPixelY;
+
+        // 著地時的灰塵回彈粒子
+        if (this.particleSystem) {
+          this.particleSystem.emitDust(this.pixelX + this.size / 2, this.pixelY + this.size - 4, 3);
+        }
       } else {
-        // 線性插值平滑位置
         this.pixelX = this.startPixelX + (this.targetPixelX - this.startPixelX) * this.jumpProgress;
         this.pixelY = this.startPixelY + (this.targetPixelY - this.startPixelY) * this.jumpProgress;
       }
@@ -114,21 +143,107 @@ export class Player {
   }
 
   public draw(ctx: CanvasRenderingContext2D) {
-    if (this.isDead) {
-      this.drawDeathAnimation(ctx);
+    const loader = AssetLoader.getInstance();
+    const spriteSheet = loader.getImage('dog');
+
+    // 若圖片未載入完成或載入失敗，以原版 Procedural 向量繪圖無縫降級兜底
+    if (!spriteSheet) {
+      this.drawProceduralFallback(ctx);
       return;
     }
 
+    this.drawPixelSprite(ctx, spriteSheet);
+  }
+
+  /**
+   * 像素精靈圖繪製 (支援 4 方向、跳躍動態與狀態機)
+   */
+  private drawPixelSprite(ctx: CanvasRenderingContext2D, sprite: HTMLImageElement) {
+    const frameW = 32;
+    const frameH = 32;
+
+    let row = 0;
+    let col = 0;
+
+    // 1. 決定精靈圖的列 (Row) 與欄 (Col)
+    if (this.isVictory) {
+      row = 4;
+      col = 2; // 歡呼勝利高舉雙爪
+    } else if (this.isDead) {
+      row = 4;
+      col = this.deathReason === 'water' ? 1 : 0; // 0: 眩暈星星, 1: 水波狗頭
+    } else {
+      // 四方向判定
+      if (this.direction === 'up') row = 0;
+      else if (this.direction === 'down') row = 1;
+      else if (this.direction === 'left') row = 2;
+      else if (this.direction === 'right') row = 3;
+
+      // 動作幀判定
+      if (this.isJumping) {
+        // 跳躍時依進度播放起跳(1)、滯空(2)、收腿著地(3)
+        if (this.jumpProgress < 0.3) col = 1;
+        else if (this.jumpProgress < 0.7) col = 2;
+        else col = 3;
+      } else {
+        // 待機時微幅搖尾 / 眨眼 (每 2 秒一次)
+        const idleCycle = Math.floor(this.idleTimer * 3) % 8;
+        col = (idleCycle === 0 || idleCycle === 1) ? 1 : 0;
+      }
+    }
+
     // 計算拋物線跳躍高度
+    let jumpY = 0;
+    if (this.isJumping) {
+      jumpY = Math.sin(this.jumpProgress * Math.PI) * this.maxJumpHeight;
+    }
+
+    ctx.save();
+    // 保持像素風格邊緣清晰
+    ctx.imageSmoothingEnabled = false;
+
+    // 繪製地面影子
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.22)';
+    ctx.beginPath();
+    const shadowScale = Math.max(0.4, 1 - jumpY / 45);
+    ctx.ellipse(
+      this.pixelX + this.size / 2,
+      this.pixelY + this.size - 4,
+      (this.size * 0.35) * shadowScale,
+      (this.size * 0.16) * shadowScale,
+      0,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+
+    // 繪製本體 (加上跳躍高度位移)
+    const drawY = this.pixelY - jumpY;
+    ctx.drawImage(
+      sprite,
+      col * frameW,
+      row * frameH,
+      frameW,
+      frameH,
+      this.pixelX,
+      drawY,
+      this.size,
+      this.size
+    );
+
+    ctx.restore();
+  }
+
+  /**
+   * 向量降級繪製
+   */
+  private drawProceduralFallback(ctx: CanvasRenderingContext2D) {
     let jumpHeight = 0;
     let squashX = 1;
     let squashY = 1;
 
     if (this.isJumping) {
-      // 拋物線 sin(pi * p)
       jumpHeight = Math.sin(this.jumpProgress * Math.PI) * this.maxJumpHeight;
-
-      // 擠壓回彈 (Takeoff & Landing Squash, Mid-air Stretch)
       if (this.jumpProgress < 0.25) {
         squashX = 1.15;
         squashY = 0.85;
@@ -151,46 +266,5 @@ export class Player {
       squashX,
       squashY
     );
-  }
-
-  private drawDeathAnimation(ctx: CanvasRenderingContext2D) {
-    ctx.save();
-    ctx.translate(this.pixelX + this.size / 2, this.pixelY + this.size / 2);
-
-    if (this.deathReason === 'water') {
-      // 落水水花波紋擴散
-      const rippleSize = Math.min(30, this.deathTimer * 40);
-      const alpha = Math.max(0, 1 - this.deathTimer * 1.5);
-      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(0, 0, rippleSize, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // 小狗旋轉下沉
-      const sinkScale = Math.max(0, 1 - this.deathTimer * 2);
-      ctx.scale(sinkScale, sinkScale);
-      ctx.rotate(this.deathTimer * 8);
-      ProceduralArt.drawDog(ctx, -this.size / 2, -this.size / 2, this.size, this.direction);
-    } else {
-      // 車撞扁平或眩暈星星
-      const squash = Math.max(0.2, 1 - this.deathTimer * 2.5);
-      ctx.scale(1.3, squash);
-      ProceduralArt.drawDog(ctx, -this.size / 2, -this.size / 2, this.size, this.direction);
-
-      // 眩暈星星旋轉
-      const starAngle = this.deathTimer * 6;
-      ctx.fillStyle = '#ECC94B';
-      for (let i = 0; i < 3; i++) {
-        const a = starAngle + (i * Math.PI * 2) / 3;
-        const sx = Math.cos(a) * 20;
-        const sy = Math.sin(a) * 10 - 15;
-        ctx.beginPath();
-        ctx.arc(sx, sy, 3.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    ctx.restore();
   }
 }

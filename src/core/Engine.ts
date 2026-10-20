@@ -5,6 +5,8 @@ import { AudioManager } from './AudioManager';
 import { UIManager } from '../ui/UIManager';
 import { LevelManager, LevelDefinition } from '../systems/LevelManager';
 import { StorageSystem } from '../systems/StorageSystem';
+import { AssetLoader } from './AssetLoader';
+import { ParticleSystem } from '../render/ParticleSystem';
 
 export type GameState = 'START' | 'PLAYING' | 'PAUSED' | 'VICTORY' | 'GAMEOVER';
 
@@ -17,6 +19,7 @@ export class Engine {
   private input: InputManager;
   private audio: AudioManager;
   private ui: UIManager;
+  private particles: ParticleSystem;
 
   public state: GameState = 'START';
   public currentMode: 'normal' | 'hell' = 'normal';
@@ -53,7 +56,13 @@ export class Engine {
     this.audio = new AudioManager();
     this.ui = new UIManager(this.audio);
     this.input = new InputManager(canvas, () => this.togglePause());
+    this.particles = new ParticleSystem();
+
     this.player = new Player(4, 0);
+    this.player.particleSystem = this.particles;
+
+    // 預載像素小狗精靈圖集 (支援相對路徑，相容 GitHub Pages 與 Cloudflare)
+    AssetLoader.getInstance().loadImage('dog', './assets/dog/dog_spritesheet.svg');
 
     this.bindUICallbacks();
     this.resizeCanvas();
@@ -146,6 +155,7 @@ export class Engine {
     this.timeLimit = def.timeLimit;
     this.timeElapsed = 0;
     this.ui.setWeather(def.weather);
+    this.particles.clear();
 
     this.player.reset(4, 0);
     this.syncPlayerScreenPos();
@@ -170,6 +180,7 @@ export class Engine {
     this.timeLimit = def.timeLimit;
     this.timeElapsed = 0;
     this.ui.setWeather(def.weather);
+    this.particles.clear();
 
     this.player.reset(4, 0);
     this.syncPlayerScreenPos();
@@ -183,10 +194,8 @@ export class Engine {
     this.lanes = [];
     const count = def.lanes.length;
 
-    // 由下而上擺放
     for (let i = 0; i < count; i++) {
       const cfg = def.lanes[i];
-      // 網格 Y = 0 位於最底，高度每格 cellSize
       const y = (count - 1 - i) * this.cellSize;
       this.lanes.push(new Lane(i, y, this.cellSize, cfg, this.stageWidth));
     }
@@ -251,6 +260,9 @@ export class Engine {
     // 更新玩家動畫與位置
     this.player.update(dt);
 
+    // 更新粒子
+    this.particles.update(dt);
+
     // 碰撞與落水檢測
     if (!this.player.isDead) {
       this.checkCollisions();
@@ -270,7 +282,6 @@ export class Engine {
     else if (dir === 'left') nextX--;
     else if (dir === 'right') nextX++;
 
-    // 邊界檢查
     if (nextX < 0 || nextX >= this.gridCols || nextY < 0 || nextY >= this.lanes.length) {
       return;
     }
@@ -281,8 +292,6 @@ export class Engine {
     const targetPy = (this.lanes.length - 1 - nextY) * this.cellSize + (this.cellSize - this.player.size) / 2;
 
     this.player.jumpTo(nextX, nextY, targetPx, targetPy, dir);
-
-    // 步進加分
     this.levelScore = Math.max(this.levelScore, nextY * 20);
   }
 
@@ -307,7 +316,6 @@ export class Engine {
 
     // 2. 河流浮島乘載與溺水檢測
     if (currentLane.type === 'river') {
-      // 若跳躍在空中則暫不結算溺水，待著陸瞬間判定
       if (!this.player.isJumping) {
         let onRaft = false;
         for (const plat of currentLane.platforms) {
@@ -318,7 +326,6 @@ export class Engine {
           }
         }
 
-        // 若沒有踩在竹筏/蒸籠上，或漂出邊界，落水身亡
         if (!onRaft || this.player.pixelX < -20 || this.player.pixelX > this.stageWidth + 20) {
           this.player.die('water');
           this.audio.playSplash();
@@ -339,15 +346,12 @@ export class Engine {
 
   private handleVictory(stallName: string) {
     this.state = 'VICTORY';
+    this.player.setVictory();
     const timeUsed = this.timeElapsed;
     const timeBonus = Math.floor(Math.max(0, (this.timeLimit - timeUsed) * 25));
     const scoreAdd = 500 + timeBonus;
     this.totalScore += scoreAdd;
 
-    // 判定星星
-    // 1 星：過關抵達
-    // 2 星：本次嘗試無傷通關 (hadMistake === false)
-    // 3 星：耗時少於 65% 時限
     let stars = 1;
     if (!this.hadMistake) stars++;
     if (timeUsed < this.timeLimit * 0.65) stars++;
@@ -363,13 +367,15 @@ export class Engine {
     this.ctx.clearRect(0, 0, this.stageWidth, this.stageHeight);
 
     this.ctx.save();
-    // 垂直相機位移
     this.ctx.translate(0, -this.cameraY);
 
     // 繪製各個地形橫列
     for (const lane of this.lanes) {
       lane.draw(this.ctx, this.stageWidth);
     }
+
+    // 繪製微塵與噴濺粒子
+    this.particles.draw(this.ctx);
 
     // 繪製玩家黃狗
     this.player.draw(this.ctx);
