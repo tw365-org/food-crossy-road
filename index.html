@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#C7E3E6" />
+    <title>美食過街 - 台灣夜市小吃大冒險</title>
+    <!-- Mandatory Favicon: 內嵌可愛小黃狗向量 SVG Data URI -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='32' r='30' fill='%23F6AD55'/%3E%3Cpath d='M16 22 L8 10 Q18 8 24 16 Z' fill='%23DD6B20'/%3E%3Cpath d='M48 22 L56 10 Q46 8 40 16 Z' fill='%23DD6B20'/%3E%3Ccircle cx='24' cy='28' r='4' fill='%232D3748'/%3E%3Ccircle cx='40' cy='28' r='4' fill='%232D3748'/%3E%3Cellipse cx='32' cy='36' rx='6' ry='4' fill='%232D3748'/%3E%3Cpath d='M29 39 Q32 44 35 39' stroke='%23C53030' stroke-width='2' fill='%23FEB2B2'/%3E%3Ccircle cx='20' cy='34' r='3' fill='%23FEB2B2' opacity='0.7'/%3E%3Ccircle cx='44' cy='34' r='3' fill='%23FEB2B2' opacity='0.7'/%3E%3C/svg%3E" />
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Chiron+GoRound+TC:wght@700;800&family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/src/ui/style.css" />
+  </head>
+  <body>
+    <main id="stage">
+      <!-- 遊戲 Canvas 渲染層 -->
+      <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+      </div>
+
+      <!-- 環境大氣特效層 -->
+      <div class="rain" id="rain" aria-hidden="true"></div>
+      <div class="fog" id="fog" aria-hidden="true"></div>
+      <div class="danger" id="danger" aria-hidden="true"></div>
+
+      <!-- HUD 頂部遊戲資訊 -->
+      <header class="hud" id="hud" aria-live="polite">
+        <div class="hud-life" id="hud-life" aria-label="剩餘生命">❤️❤️❤️</div>
+        <div class="hud-mid">
+          <div class="hud-row">
+            <span id="hud-level">關卡 1/10</span>
+            <span class="number" id="hud-time">01:00</span>
+          </div>
+        </div>
+        <div class="hud-right">
+          <span class="number score-box" id="hud-score">0</span>
+          <button class="icon-btn btn-sfx" id="btn-sound" type="button" aria-label="聲音開關">🔊</button>
+          <button class="icon-btn" id="btn-pause" aria-label="暫停">⏸</button>
+        </div>
+      </header>
+
+      <!-- 時間條進度 -->
+      <div class="timebar" id="timebar" aria-hidden="true">
+        <div class="timebar-fill" id="timebar-fill"></div>
+        <div class="timebar-star" id="timebar-star">★</div>
+      </div>
+
+      <!-- 手機觸控 D-Pad -->
+      <nav class="dpad" id="dpad" aria-label="方向鍵">
+        <button data-dir="up" aria-label="往前">▲</button>
+        <button data-dir="left" aria-label="往左">◀</button>
+        <button data-dir="down" aria-label="往後">▼</button>
+        <button data-dir="right" aria-label="往右">▶</button>
+      </nav>
+
+      <!-- 浮動提示 Toast -->
+      <div class="toast" id="toast" role="status"></div>
+
+      <!-- 1. 開始畫面 Overlay -->
+      <section class="overlay" id="ov-start">
+        <div class="panel">
+          <div class="brand-badge">🍢 台灣夜市大冒險 🧋</div>
+          <h1 class="title start-title">美食過街</h1>
+          <p class="body start-intro">
+            帶小黃狗穿過車道、踩著竹筏和蒸籠過河，走到對岸小吃攤就過關！
+            共 10 關，每關最多拿 3 顆星；全破後進入無盡模式挑戰最高分，並解鎖地獄模式！
+          </p>
+          <div class="start-goals">
+            <p class="start-goals-title">如何拿到 ★★★</p>
+            <p class="start-goals-list">抵達小吃攤 | 零失誤通關 | 限制時間內達陣</p>
+          </div>
+          <ul class="help">
+            <li>💻 <strong>電腦控制</strong>：方向鍵 或 WASD 移動，Esc 鍵暫停</li>
+            <li>📱 <strong>手機觸控</strong>：滑動或點擊螢幕邊界，或使用虛擬方向鍵</li>
+          </ul>
+
+          <div class="btn-row mode-row">
+            <button class="btn primary btn-bounce" id="btn-start">一般模式 (10 關)</button>
+            <button class="btn hell locked" id="btn-hell">
+              <span class="lock-icon">🔒</span>
+              <span>地獄模式</span>
+            </button>
+          </div>
+          <p class="caption hell-hint" id="hell-hint">通關一般模式 10 關即可解鎖地獄極速挑戰！</p>
+
+          <div class="btn-row">
+            <button class="btn secondary" id="btn-open-dex">📖 美食圖鑑</button>
+            <button class="btn secondary" id="btn-open-rank">🏆 排行榜</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 2. 過關結算 Overlay -->
+      <section class="overlay hidden" id="ov-victory">
+        <div class="panel victory-panel">
+          <h2 class="heading" id="vic-title">🎉 通關成功！</h2>
+          <div class="stars-display" id="vic-stars">
+            <span class="star active">★</span>
+            <span class="star active">★</span>
+            <span class="star active">★</span>
+          </div>
+          <p class="vic-summary" id="vic-summary">小黃狗順利抵達了「士林大香腸」攤位！</p>
+          <div class="vic-details">
+            <div>耗時：<strong id="vic-time">18.5s</strong></div>
+            <div>得分：<strong id="vic-score">+1250</strong></div>
+          </div>
+          <div class="btn-row">
+            <button class="btn primary" id="btn-next-level">下一關 ➔</button>
+            <button class="btn secondary" id="btn-draw-card">🎁 抽取過關美食卡</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 3. 遊戲失敗 Overlay -->
+      <section class="overlay hidden" id="ov-gameover">
+        <div class="panel">
+          <h2 class="heading text-danger" id="fail-title">💥 哎呀，失誤了！</h2>
+          <p class="body" id="fail-desc">小黃狗需要更敏銳地觀察車流與水流！</p>
+          <div class="btn-row">
+            <button class="btn primary" id="btn-retry">再試一次 🔄</button>
+            <button class="btn secondary" id="btn-back-menu">返回主選單</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 4. 美食卡抽卡結果 Overlay -->
+      <section class="overlay hidden" id="ov-card" aria-label="美食卡">
+        <div class="card-stage">
+          <div class="food-card" id="food-card">
+            <div class="fc-face fc-front">
+              <div class="fc-top">
+                <span class="fc-rarity" id="fc-rarity">稀有 ★★★</span>
+                <span class="fc-badge" id="fc-badge">NEW!</span>
+              </div>
+              <div class="fc-icon" id="fc-icon">🧋</div>
+              <p class="fc-cat" id="fc-cat">咖啡茶飲</p>
+              <h2 class="fc-name" id="fc-name">珍珠奶茶</h2>
+              <p class="fc-dist" id="fc-dist">📍 逢甲夜市 / 全台知名</p>
+              <p class="fc-blurb" id="fc-blurb">濃醇黑糖蜜熬煮珍珠，搭配現調奶茶，台灣揚名國際的靈魂飲品！</p>
+            </div>
+          </div>
+          <div class="fc-actions">
+            <a class="btn primary fc-map" id="fc-map" target="_blank" rel="noopener">在 Google 地圖探索</a>
+            <button class="btn secondary" id="fc-close">收入圖鑑</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 5. 美食圖鑑 Overlay -->
+      <section class="overlay hidden dex" id="ov-dex" aria-label="美食圖鑑">
+        <div class="dex-panel">
+          <header class="dex-head">
+            <h2 class="heading">🏮 台灣夜市美食圖鑑</h2>
+            <button class="icon-btn" id="dex-close" aria-label="關閉圖鑑">✕</button>
+          </header>
+          <div class="dex-tools">
+            <select id="dex-cat-filter" aria-label="分類">
+              <option value="">全部分類 (全部)</option>
+              <option value="小吃">夜市小吃</option>
+              <option value="麵食">熱騰麵食</option>
+              <option value="甜點">傳統甜品</option>
+              <option value="飲品">冰品茶飲</option>
+            </select>
+            <div class="dex-count" id="dex-count">收集進度: 0 / 20</div>
+          </div>
+          <div class="dex-grid" id="dex-list"></div>
+        </div>
+      </section>
+
+      <!-- 6. 排行榜 Overlay -->
+      <section class="overlay hidden" id="ov-rank" aria-label="排行榜">
+        <div class="dex-panel">
+          <header class="dex-head">
+            <h2 class="heading">🏆 冒險者排行榜</h2>
+            <button class="icon-btn" id="rank-close" aria-label="關閉排行榜">✕</button>
+          </header>
+          <ol class="rank-list" id="rank-list">
+            <!-- 動態注入排行榜名次 -->
+          </ol>
+        </div>
+      </section>
+
+      <!-- 7. 暫停 Overlay -->
+      <section class="overlay hidden" id="ov-pause">
+        <div class="panel">
+          <h2 class="heading">⏸ 遊戲已暫停</h2>
+          <div class="btn-row">
+            <button class="btn primary" id="btn-resume">繼續遊戲</button>
+            <button class="btn secondary" id="btn-pause-menu">主選單</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
